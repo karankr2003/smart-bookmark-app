@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
 
   if (code) {
-    // Create response for redirect - we need to set cookies on this response
     const response = NextResponse.redirect(new URL('/', requestUrl.origin))
 
     const supabase = createServerClient(

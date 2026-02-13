@@ -2,6 +2,8 @@
 
 A modern, secure, and real-time bookmark manager built with Next.js, Supabase, and Tailwind CSS.
 
+This README describes the project, setup, and—as preferred—**the main problems faced during development and how each was solved** (see [Problems Encountered & Solutions](#problems-encountered--solutions)).
+
 ## Features
 
 - **Google OAuth Authentication**: Sign in securely with your Google account
@@ -20,6 +22,50 @@ A modern, secure, and real-time bookmark manager built with Next.js, Supabase, a
 - **Real-time**: Supabase Real-time Subscriptions
 - **Deployment**: Vercel
 
+## Problems Encountered & Solutions
+
+This section documents the main challenges encountered while building the app and how each was resolved.
+
+### 1. 401 Unauthorized on Bookmarks API After Google Sign-in
+**Problem:** After successfully logging in with Google, the app showed "Failed to fetch bookmarks" and "Failed to add bookmark". The API routes returned 401.
+
+**Cause:** The auth callback used the standard `createClient` from `@supabase/supabase-js`, which stores the session in localStorage. API routes run on the server and have no access to localStorage, so they could not read the session.
+
+**Solution:** Switched to `@supabase/ssr` for cookie-based sessions:
+- Auth callback now uses `createServerClient` and sets session cookies on the redirect response
+- API routes use `createServerClient` to read the session from request cookies
+- Added middleware to refresh the session on each request
+- Browser client uses `createBrowserClient` (stores session in cookies)
+- Added `credentials: 'include'` to fetch calls so cookies are sent with API requests
+
+### 2. "Unsupported provider: provider is not enabled"
+**Problem:** Clicking "Sign in with Google" returned a 400 error: `validation_failed - Unsupported provider`.
+
+**Cause:** Google OAuth was configured in Google Cloud Console, but the Google provider was not enabled in Supabase.
+
+**Solution:** Enable the provider in **Supabase Dashboard → Authentication → Providers → Google**. Turn it on and paste your Google Client ID and Client Secret. The OAuth Apps section is different—you need the **Providers** section.
+
+### 3. Real-time Updates Not Working Across Tabs
+**Problem:** Adding a bookmark in one tab did not appear in another open tab.
+
+**Cause:** The `bookmarks` table was not added to Supabase's Realtime publication. Realtime subscriptions require the table to be included in the publication.
+
+**Solution:** Run the SQL in SETUP.md Step 2 to add the table to the Realtime publication, or enable replication for the `bookmarks` table in **Supabase Dashboard → Database → Replication**.
+
+### 4. Next.js "Router action dispatched before initialization"
+**Problem:** Occasional runtime error during development.
+
+**Cause:** Race condition with Hot Module Replacement (HMR) when the dev server restarts.
+
+**Solution:** Stop the dev server, delete the `.next` folder, run `pnpm dev` again. A hard refresh (Ctrl+Shift+R) can also help.
+
+### 5. TypeScript: Parameter 'payload' implicitly has an 'any' type
+**Problem:** In `bookmarks-list.tsx`, the Supabase Realtime `postgres_changes` callback triggered TS7006 because the `payload` parameter had no type.
+
+**Cause:** Supabase's subscription callback does not ship with explicit types in this setup, so TypeScript inferred `any`, which is disallowed under strict settings.
+
+**Solution:** Defined a `PostgresChangePayload` interface (`eventType`, `new`, `old`) and typed the callback as `(payload: PostgresChangePayload)`. Kept `as Bookmark` when reading `payload.new` / `payload.old` for type narrowing.
+
 ## Quick Start
 
 ### Prerequisites
@@ -32,7 +78,7 @@ A modern, secure, and real-time bookmark manager built with Next.js, Supabase, a
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/karankr2003/smart-bookmark-app.git
    cd smart-bookmark-app
    ```
 
@@ -169,70 +215,10 @@ Quick deployment:
 1. Push to GitHub
 2. Import repository on Vercel
 3. Add environment variables
-4. Deploy!
+4. Deploy
 
-## Contributing
-
-Feel free to fork this project and submit pull requests with improvements.
-
-## License
-
-MIT License - feel free to use this project for your own purposes.
-
-## Problems Encountered & Solutions
-
-### 1. 401 Unauthorized on Bookmarks API After Google Sign-in
-**Problem:** After successfully logging in with Google, the app showed "Failed to fetch bookmarks" and "Failed to add bookmark". The API routes returned 401.
-
-**Cause:** The auth callback used the standard `createClient` from `@supabase/supabase-js`, which stores the session in localStorage. API routes run on the server and have no access to localStorage, so they could not read the session.
-
-**Solution:** Switched to `@supabase/ssr` for cookie-based sessions:
-- Auth callback now uses `createServerClient` and sets session cookies on the redirect response
-- API routes use `createServerClient` to read the session from request cookies
-- Added middleware to refresh the session on each request
-- Browser client uses `createBrowserClient` (stores session in cookies)
-- Added `credentials: 'include'` to fetch calls so cookies are sent with API requests
-
-### 2. "Unsupported provider: provider is not enabled"
-**Problem:** Clicking "Sign in with Google" returned a 400 error: `validation_failed - Unsupported provider`.
-
-**Cause:** Google OAuth was configured in Google Cloud Console, but the Google provider was not enabled in Supabase.
-
-**Solution:** Enable the provider in **Supabase Dashboard → Authentication → Providers → Google**. Turn it on and paste your Google Client ID and Client Secret. The OAuth Apps section is different—you need the **Providers** section.
-
-### 3. Real-time Updates Not Working Across Tabs
-**Problem:** Adding a bookmark in one tab did not appear in another open tab.
-
-**Cause:** The `bookmarks` table was not added to Supabase's Realtime publication. Realtime subscriptions require the table to be included in the publication.
-
-**Solution:** Run the SQL in SETUP.md Step 2 to add the table to the Realtime publication, or enable replication for the `bookmarks` table in **Supabase Dashboard → Database → Replication**.
-
-### 4. Next.js "Router action dispatched before initialization"
-**Problem:** Occasional runtime error during development.
-
-**Cause:** Race condition with Hot Module Replacement (HMR) when the dev server restarts.
-
-**Solution:** Stop the dev server, delete the `.next` folder, run `pnpm dev` again. A hard refresh (Ctrl+Shift+R) can also help.
-
----
 
 ## Support
-
-For issues or questions:
-1. Check the `SETUP.md` and `DEPLOYMENT.md` files
-2. Review Supabase and Next.js documentation
-3. Open an issue in the repository
-
-## Future Enhancements
-
-Possible features for future versions:
-- Categories/Tags for bookmarks
-- Search functionality
-- Export bookmarks
-- Bookmark sharing
-- Dark mode
-- Mobile app
-- Browser extensions
 
 ---
 

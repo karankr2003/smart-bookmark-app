@@ -12,7 +12,6 @@ export async function DELETE(
     const { id } = await params
 
     if (isDemoMode) {
-      // Demo mode: use persistent storage
       const user = demoAuth.getCurrentUser()
       if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,7 +29,6 @@ export async function DELETE(
       return NextResponse.json({ success: true })
     }
 
-    // Real Supabase mode - uses cookie-based session
     const supabase = await createClient()
     if (!supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
